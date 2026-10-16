@@ -12,7 +12,7 @@ pipeline {
 
     environment {
         APP_DIR    = 'rastreador-financeiro'
-        DEPLOY_DIR = "${env.JENKINS_HOME}/deploy/rastreador"
+        DEPLOY_DIR = "${env.JENKINS_HOME}\\deploy\\rastreador"
         APP_PORT   = '8081'
         CI         = 'true'
     }
@@ -21,8 +21,8 @@ pipeline {
         stage('Build') {
             steps {
                 dir(env.APP_DIR) {
-                    sh 'npm ci --no-audit --no-fund'
-                    sh 'npm run build'
+                    bat 'npm ci --no-audit --no-fund'
+                    bat 'npm run build'
                 }
             }
             post {
@@ -35,7 +35,7 @@ pipeline {
         stage('Testes') {
             steps {
                 dir(env.APP_DIR) {
-                    sh 'npm run test:ci'
+                    bat 'npm run test:ci'
                 }
             }
             post {
@@ -58,13 +58,22 @@ pipeline {
         stage('Deploy') {
             when { branch 'main' }
             steps {
-                sh '''
-                    mkdir -p "$DEPLOY_DIR"
-                    rm -rf "$DEPLOY_DIR"/*
-                    cp -r ${APP_DIR}/build/* "$DEPLOY_DIR"/
-                    pkill -f "serve -s $DEPLOY_DIR" || true
-                    JENKINS_NODE_COOKIE=dontKillMe nohup npx --yes serve -s "$DEPLOY_DIR" -l $APP_PORT > /dev/null 2>&1 &
+                bat '''
+                    if not exist "%DEPLOY_DIR%" mkdir "%DEPLOY_DIR%"
+                    robocopy "%APP_DIR%\\build" "%DEPLOY_DIR%" /MIR /NFL /NDL /NJH /NJS
+                    if %ERRORLEVEL% GEQ 8 exit /b 1
+                    exit /b 0
                 '''
+                bat '''
+                    for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%APP_PORT%" ^| findstr LISTENING') do taskkill /F /PID %%a
+                    exit /b 0
+                '''
+                withEnv(['JENKINS_NODE_COOKIE=dontKillMe', 'BUILD_ID=dontKillMe']) {
+                    bat '''
+                        start "" /B cmd /c "npx --yes serve -s "%DEPLOY_DIR%" -l %APP_PORT% > nul 2>&1"
+                        exit /b 0
+                    '''
+                }
             }
         }
     }
