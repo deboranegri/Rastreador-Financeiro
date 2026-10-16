@@ -21,6 +21,19 @@ pipeline {
     }
 
     stages {
+        stage('Build') {
+            steps {
+                dir(env.APP_DIR) {
+                    bat 'npm ci --no-audit --no-fund'
+                    bat 'npm run build'
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: "${APP_DIR}/build/**", fingerprint: true
+                }
+            }
+        }    
         stage('Testes') {
             steps {
                 dir(env.APP_DIR) {
